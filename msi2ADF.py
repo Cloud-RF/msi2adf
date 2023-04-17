@@ -2,8 +2,24 @@
 #
 # MSI to ADF antenna pattern conversion utility
 #
-# Copyright 2022 Farrant Consulting Ltd
-# CloudRF.com
+# Copyright (c) 2023 Farrant Consulting Ltd T/A CloudRF
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE
 
 import csv
 import sys
@@ -11,6 +27,7 @@ import numpy as np
 from scipy.interpolate import make_interp_spline, BSpline
 import os
 from collections import deque
+from datetime import datetime
 
 horizontal = []
 vertical = []
@@ -20,33 +37,38 @@ oem=""
 model=""
 limit=90 # db threshold for QC
 targetPlane = "Vertical"# Horizontal | Vertical | Total
+extraRotation = 90 # Some OEMs align north 0, others East 90, others south 180...
 
 if len(sys.argv) < 2:
-    print("Usage: python3 msi2adf.py {ets.csv}")
+    print("Usage: python3 msi2adf.py {pattern.msi}")
     quit()
 
 def rotate(l, n):
     return l[n:] + l[:n]
 
-def writeADF(filename,oem,model,frequencyMHz,gainDBi,horizontal,vertical):
+def writeADF(filename,oem,model,frequencyMHz,gainDBi,horizontal,vertical,extraRotation):
     filename = filename +".adf"
     print(filename)
+
+    # WARNING - This makes an assumption based on data from a few OEMs. Data in the wild may vary!
 
     horizontal = deque(horizontal)
     horizontal.rotate(180)
 
     vertical = deque(vertical)
-    vertical.rotate(180)
+    vertical.rotate(180+extraRotation)
+
+    yearMonthDay = datetime.today().strftime("%Y%m%d")
 
     adf = open(filename,"w")
     adf.write("REVNUM:,TIA/EIA-804-B\r\n")
-    adf.write("REVDAT:,20221004\r\n")
+    adf.write("REVDAT:,"+yearMonthDay+"\r\n")
     adf.write("COMNT1:,Standard TIA/EIA Antenna Pattern Data\r\n")
     adf.write("ANTMAN:,"+oem+"\r\n")
     adf.write("MODNUM:,"+model+"\r\n")
     adf.write("DESCR1:,"+str(frequencyMHz)+"MHz\r\n")
-    adf.write("DESCR2:,Made with love at CloudRF.com\r\n")
-    adf.write("DTDATA:,20221004\r\n")
+    adf.write("DESCR2:,Converted at CloudRF.com\r\n")
+    adf.write("DTDATA:,"+yearMonthDay+"\r\n")
     adf.write("LOWFRQ:,"+str(frequencyMHz-100)+"\r\n")
     adf.write("HGHFRQ:,"+str(frequencyMHz+100)+"\r\n")
     adf.write("GUNITS:,DBI/DBR\r\n")
@@ -101,6 +123,7 @@ with open(sys.argv[1]) as csvfile:
     gainDBi=0
     last=-1
 
+
     for row in reader:
         if row[0] == "NAME":
             size = len(row)
@@ -141,7 +164,7 @@ with open(sys.argv[1]) as csvfile:
             angle = float(row[0])
             gain = round(float(row[1]) * -1,3)
 
-            # Handle stupid 0.1 increments
+            # Handle pretentious 0.1 increments by only using angles > 0.95
             if abs(angle-last) > 0.95:
                 vertical.append(gain)
                 last=angle
@@ -149,4 +172,4 @@ with open(sys.argv[1]) as csvfile:
         pos+=1
         r+=1
 
-    writeADF(sys.argv[1],oem,model,frequencyMHz,gainDBi,horizontal,vertical)
+    writeADF(sys.argv[1],oem,model,frequencyMHz,gainDBi,horizontal,vertical,extraRotation)
