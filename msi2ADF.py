@@ -158,7 +158,7 @@ with open(sys.argv[1]) as csvfile:
         if pos > horizontalRows and pos < verticalRows and row[0] != "VERTICAL":
             angle = float(row[0])
             gain = round(float(row[1]) * -1,3)
-            horizontal.append(gain+gainDBi)
+            horizontal.append(gain)
 
         if pos > verticalRows and row[0] != "HORIZONTAL":
             angle = float(row[0])
@@ -166,7 +166,7 @@ with open(sys.argv[1]) as csvfile:
 
             # Handle pretentious 0.1 increments by only using angles > 0.95
             if abs(angle-last) > 0.95:
-                vertical.append(gain+gainDBi)
+                vertical.append(gain)
                 last=angle
 
         pos+=1
